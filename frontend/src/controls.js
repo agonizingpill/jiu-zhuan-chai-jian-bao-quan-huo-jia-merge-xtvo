@@ -10,13 +10,14 @@ function input(field) {
     el('option',{value:'false', selected:fallback(field) === false ? '' : undefined},'否'));
   if (field.kind === 'json') return el('textarea', {name:field.name, required:''}, JSON.stringify(fallback(field), null, 2));
   const numeric = ['int','float'].includes(field.kind);
-  return el('input',{name:field.name, required:'', type:numeric ? 'number' : 'text',
+  return el('input',{name:field.name, required:field.optional ? undefined : '', type:numeric ? 'number' : 'text',
     step:field.kind === 'float' ? 'any' : undefined, value:fallback(field) ?? ''});
 }
 function parse(form, fields) {
   const data = new FormData(form);
   return Object.fromEntries(fields.map(field => {
     const raw = data.get(field.name);
+    if (field.optional && (raw === '' || raw === null)) return [field.name, null];
     const convert = ['int','float'].includes(field.kind) ? Number :
       ['bool','json'].includes(field.kind) ? JSON.parse : String;
     return [field.name, convert(raw)];

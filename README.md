@@ -7,7 +7,8 @@
 模拟客户为西汀砖材回收站。砖垛拆除来源、孔形测量、批量压缩分簇、货架合垛；非承重与新近返潮垛禁止合栈。
 
 - 拆建来源凭单 `demolitions`，字段为 `street`（来源街道）、`survey`（拆检通告）、`load_grade`（用途级别）、`allowed`（已放行拆建）。模型约束位于 `backend/domain/demolitions_model.py`，规则位于 `demolitions_service.py`。
-- 砖垛孔形实测 `brick_stacks`，字段为 `origin`（拆建凭单）、`length`（单砖长 mm）、`perforation`（孔隙比）、`wet`（含湿率 %）、`weighed`（水分复检）、`pieces`（砖数）、`merged`（已合垛）。模型约束位于 `backend/domain/brick_stacks_model.py`，规则位于 `brick_stacks_service.py`。
+- 砖垛孔形实测 `brick_stacks`，字段为 `origin`（拆建凭单）、`length`（单砖长 mm）、`perforation`（孔隙比）、`initial_wet`（初测湿度 %）、`wet`（当前含湿率 %）、`weighed`（水分复检）、`pieces`（砖数）、`merged`（已合垛）、`reading_rev`（读数版本）。模型约束位于 `backend/domain/brick_stacks_model.py`，规则位于 `brick_stacks_service.py`。
+- 堆场待复测榜 `yard_scores`，字段为 `stack`（待复测垛）、`score`（超标风险，空值表示无法估计）、`basis`（训练读数版本快照）、`token`（计算号）、`updated`（出分时间）。模型约束位于 `backend/domain/yard_model.py`，规则位于 `yard_service.py`。
 - 货架分簇候选 `rack_candidates`，字段为 `member`（试配砖垛）、`pair`（同组砖垛）、`cluster_size`（同簇总垛数）、`token`（计算号）。模型约束位于 `backend/domain/rack_candidates_model.py`，规则位于 `rack_candidates_service.py`。
 - 合垛货架卡 `rack_merges`，字段为 `candidate`（参考候选）、`rack`（保全货架）、`pieces`（合计砖数）、`operator_note`（交接标签）。模型约束位于 `backend/domain/rack_merges_model.py`，规则位于 `rack_merges_service.py`。
 
@@ -37,6 +38,7 @@ docker compose exec -T backend python -m scripts.seed_demo
 打开 `http://127.0.0.1:18326`。FastAPI OpenAPI 在 `http://127.0.0.1:19326/docs`。
 Compose 运行 Nginx、Python FastAPI、独立 Redis 消费进程、SQL 数据库和 Redis，SQL 与 Redis 使用命名卷。
 本机开发时，在 Python 3.11 环境安装 `backend/requirements.txt` 后从 backend 目录运行 `uvicorn core.app:app`。须提供 `DATABASE_URL`、`REDIS_URL`、`JWT_SECRET`，`SEED_DEMO` 控制演示初始化。
+表结构有变更时（如本次新增 `yard_scores` 与 `brick_stacks` 新列），需 `docker compose down -v` 清掉旧数据卷后重新启动并初始化。
 
 | 演示账号 | 权限 |
 |---|---|
@@ -52,10 +54,19 @@ Compose 运行 Nginx、Python FastAPI、独立 Redis 消费进程、SQL 数据�
 |---|---|---|
 | 拆建来源凭单 | `/demolitions` /demolitions/confirm-release | `frontend/src/pages/demolitions.js` |
 | 砖垛孔形实测 | `/brick_stacks` /brick_stacks/survey-stack，/brick_stacks/confirm-moisture | `frontend/src/pages/brick_stacks.js` |
+| 堆场待复测榜 | `/yard` /yard/assess | `frontend/src/pages/yard.js` |
 | 货架分簇候选 | `/rack_candidates` /rack_candidates/suggest-pair，/rack_candidates/record-candidate | `frontend/src/pages/rack_candidates.js` |
 | 合垛货架卡 | `/rack_merges` /rack_merges/pack-rack | `frontend/src/pages/rack_merges.js` |
 
-SQL 实体与约束在 `backend/domain` 下维护。前端使用原生 ES modules。核心算子为 Birch。在孔隙比和砖长标准化空间逐批更新 BIRCH 子簇，返回当前同簇最邻近参考垛。
+### 堆场待复测榜规则
+
+复测员按榜先查容易返潮的垛。评分用初测湿度和孔形（砖长、孔隙比）训练逻辑回归，预测复测超 6% 的风险，由队列 worker 异步出分并写入 `yard_scores` 榜。
+
+- 训练排除与待测垛同拆建凭单的样本；缺初测的垛不进训练也不出分；训练样本缺超标或未超标垛时显示无法估计。
+- 复测值更正后，用过该读数的分数立即失效并重算，其余照排；分数带训练读数版本快照，晚到的旧分不回榜。
+- 出分和复测登记并发时，复测入账即撤下该垛，晚来的分数排不进去。
+
+SQL 实体与约束在 `backend/domain` 下维护。前端使用原生 ES modules。核心算子为 Birch 与逻辑回归。在孔隙比和砖长标准化空间逐批更新 BIRCH 子簇，返回当前同簇最邻近参考垛。
 
 模拟读数与审查范围仅用于保全操作演练。现有库存通过内置种子初始化。
 

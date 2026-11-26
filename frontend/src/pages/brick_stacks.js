@@ -25,8 +25,12 @@
       "label": "孔隙比"
     },
     {
+      "name": "initial_wet",
+      "label": "初测湿度 %"
+    },
+    {
       "name": "wet",
-      "label": "含湿率 %"
+      "label": "当前含湿率 %"
     },
     {
       "name": "weighed",
@@ -75,9 +79,10 @@
         },
         {
           "name": "wet",
-          "label": "含湿率 %",
+          "label": "初测湿度 %",
           "kind": "float",
-          "initial": 9
+          "initial": 9,
+          "optional": true
         },
         {
           "name": "pieces",
@@ -86,7 +91,7 @@
           "initial": 32
         }
       ],
-      "help": "登记砖长、孔隙与湿度。",
+      "help": "登记砖长、孔隙与初测湿度；湿度可留空，缺初测的垛不参与堆场评分。",
       "roles": [
         "operator",
         "reviewer"
@@ -106,12 +111,12 @@
         },
         {
           "name": "wet",
-          "label": "含湿率 %",
+          "label": "复测湿度 %",
           "kind": "float",
           "initial": 3.6
         }
       ],
-      "help": "复核湿度后保留读数。",
+      "help": "复核湿度后保留读数；更正读数会让用过该读数的堆场分数失效重算。",
       "roles": [
         "reviewer"
       ],

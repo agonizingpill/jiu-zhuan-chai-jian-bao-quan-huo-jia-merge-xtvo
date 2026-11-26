@@ -8,7 +8,7 @@ class SurveyStack(BaseModel):
     origin: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
     length: FiniteFloat
     perforation: FiniteFloat
-    wet: FiniteFloat
+    wet: FiniteFloat | None = None
     pieces: int
 
 
